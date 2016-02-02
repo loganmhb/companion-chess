@@ -1,9 +1,11 @@
-game = new Chess()
-
 statusEl = $('#status')
 pgnEl = $('#pgn')
 fenEl = $('#fen')
 computerMoveBtn = $('#move')
+newgame = $('#newgame')
+game = null
+board = null
+
 
 onDragStart = (source, piece, position, orientation) ->
         console.log "Game turn: #{game.turn()}"
@@ -35,7 +37,9 @@ updateStatus = () ->
 
         statusEl.html(status)
         fenEl.html(game.fen())
+        console.log(game.pgn())
         pgnEl.html(game.pgn())
+        if game.turn() != playerSide then makeComputerMove()
 
 cfg = {
   draggable: true,
@@ -49,11 +53,20 @@ makeComputerMove = () ->
   console.log("Making computer move.")
   engine.makeBestMove(game.fen(), (move) ->
     result = game.move(move)
-    console.log(game.fen())
     board.position(game.fen())
+    updateStatus()
     )
 
-computerMoveBtn.click((event) -> makeComputerMove())
+playerSide = 'w'
 
-board = ChessBoard('board', cfg)
-updateStatus()
+begin = () ->
+  game = new Chess()
+  board = ChessBoard('board', cfg)
+  updateStatus()
+
+newgame.click((event) ->
+  playerSide = $("#sideSelector").val()
+  begin())
+
+
+begin()
