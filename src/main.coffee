@@ -1,68 +1,46 @@
-statusEl = $('#status')
-pgnEl = $('#pgn')
-fenEl = $('#fen')
-computerMoveBtn = $('#move')
-newgame = $('#newgame')
+requirejs.config(
+  baseUrl: "js/"
+  shim: {
+    'lib/chessboard-0.3.0': {
+      exports: "ChessBoard",
+      deps: ["jquery"]}
+    }
+)
 
-updateStatus = () ->
-  if (game.turn() == 'w') then moveColor = 'White' else moveColor = 'Black'
-  if game.in_checkmate()
-    status = 'Game over, #{moveColor} is in checkmate.'
-  else if game.in_draw()
-    status = 'Game over, drawn position.'
-  else
-    status = moveColor + ' to move.'
-    if game.in_check()
-      status += ' In check.'
+requirejs(["lib/chess","board", "engine", "controlPanel"],
+  (Chess, board, engine, controlPanel) ->
+    game = new Chess()
 
-  statusEl.html(status)
-  fenEl.html(game.fen())
-  console.log(game.pgn())
-  pgnEl.html(game.pgn())
+    playerSide = 'w'
 
-updateBoard = () -> board.position(game.fen())
+    uciHandler = (uciCommand) ->
+      switch uciCommand.type
+        when "info" then console.log("Info command received.")
+        when "bestmove" then makeComputerMove(uciCommand.move)
 
-pieceBelongsToMovingSide = (movingSide, piece) ->
-  (movingSide == 'w' and piece.search(/^b/) != 1) and
-  (movingSide == 'b' and piece.search(/^w/) != 1)
+    moveHandler = (event) ->
+      switch event.type
+        when "move"
+          game.move(event.move)
+          b.position(game.fen())
+          if game.turn() != playerSide
+            engine.searchForBestMove(game.fen(), uciHandler)
 
-cfg = {
-  draggable: true,
-  position: 'start',
-  onDragStart: (source, piece, position, orientation) ->
-    console.log "Game turn: #{game.turn()}"
-    if game.game_over() or pieceBelongsToMovingSide(game.turn(), piece)
-          return false
+    cp = controlPanel(game, (side) -> playerSide = side; newGame())
+    b = board(game, moveHandler)
 
-  onDrop: (source, target) ->
-    move = game.move(from: source, to: target, promotion: 'q')
-    return 'snapback' if move == null
-    updateStatus()
-    if game.turn() != playerSide then makeComputerMove()
+    makeComputerMove = (move) ->
+      game.move(move)
+      b.position(game.fen())
+      cp.updateStatus(game)
 
-  onSnapEnd: () -> updateBoard()
-}
+    newGame = () ->
+      game.reset()
+      b.orientation = (if playerSide == 'w' then "white" else "black")
+      b.position(game.fen())
+      cp.updateStatus(game)
+      if playerSide == 'b'
+        engine.searchForBestMove(game.fen(), uciHandler)
 
-game = new Chess()
-board = new ChessBoard('board', cfg)
-
-makeComputerMove = () ->
-  console.log("Making computer move.")
-  engine.makeBestMove(game.fen(), (move) ->
-    result = game.move(move)
-    updateBoard()
-    updateStatus()
-    )
-
-playerSide = 'w'
-
-begin = () ->
-  game.reset()
-  board.orientation(if playerSide == 'w' then "white" else "black")
-  updateBoard()
-  updateStatus()
-  makeComputerMove() if playerSide == 'b'
-
-newgame.click((event) ->
-  playerSide = $("#sideSelector").val()
-  begin())
+    newGame()
+)
